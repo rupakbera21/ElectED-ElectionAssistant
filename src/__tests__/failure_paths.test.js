@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateElectionResponse } from '../services/aiService';
+import { generateElectionResponse } from '../logic/electionEngine';
 import { OFFLINE_FAQS } from '../data/faqs';
 import Fuse from 'fuse.js';
 
 // Mocking the AI Service
-vi.mock('../services/aiService', () => ({
+vi.mock('../logic/electionEngine', () => ({
   generateElectionResponse: vi.fn(),
 }));
 

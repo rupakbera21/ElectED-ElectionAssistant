@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateElectionQuery } from '../src/services/aiService';
+import { validateElectionQuery } from '../src/logic/electionEngine';
 
 describe('Guardrail Logic', () => {
   it('should allow election-related keywords', () => {

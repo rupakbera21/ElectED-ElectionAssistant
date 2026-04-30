@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, memo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, Send, Sparkles, ChevronRight, ArrowLeft, Home, ShieldCheck, ThumbsUp, ThumbsDown } from "lucide-react";
 import mascot from "../assets/mascot.png";
-import { generateElectionResponse } from "../services/aiService";
+import { generateElectionResponse } from "../logic/electionEngine";
 import { translations } from "../data/translations";
 import { OFFLINE_FAQS } from "../data/faqs";
 import { db, analytics, logEvent } from "../lib/firebase";
@@ -94,6 +94,14 @@ const ChatMessage = memo(({ msg, onFeedback }) => {
           
           {msg.type === "bot" ? (
             <>
+              {msg.provider && !msg.isOfflineAlert && (
+                <div className="flex items-center gap-1.5 mb-2 border-b border-white/5 pb-1.5">
+                  <div className={`w-1.5 h-1.5 rounded-full ${msg.provider === 'gemini' ? 'bg-blue-400' : msg.provider === 'groq' ? 'bg-orange-400' : 'bg-amber-500'}`} />
+                  <span className="text-[9px] uppercase font-black tracking-widest opacity-60">
+                    {msg.provider === 'gemini' ? 'Tier 1 AI (Google)' : msg.provider === 'groq' ? 'Tier 2 AI (Groq)' : 'Verified Local Data'}
+                  </span>
+                </div>
+              )}
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 components={markdownComponents}
@@ -148,6 +156,7 @@ export default function ElectionBuddy({ isOpen, setIsOpen, currentStep, isDark, 
   
   // Offline State
   const [isOffline, setIsOffline] = useState(false);
+  const [activeProvider, setActiveProvider] = useState('initializing'); // 'gemini' | 'groq' | 'local'
   const [faqView, setFaqView] = useState("categories"); // categories, questions, answer
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [selectedAnswer, setSelectedAnswer] = useState(null);
@@ -303,22 +312,26 @@ export default function ElectionBuddy({ isOpen, setIsOpen, currentStep, isDark, 
     }
 
     try {
-      const { text, isOffline: offline } = await generateElectionResponse(userMsg, language);
+      const { text, isOffline: offline, provider } = await generateElectionResponse(userMsg, language);
       
+      setActiveProvider(provider);
+
       if (offline) {
         setIsOffline(true);
-        if (analytics) logEvent(analytics, 'offline_fallback_triggered', { query: userMsg });
+        if (analytics) logEvent(analytics, 'offline_fallback_triggered', { query: userMsg, provider });
         setMessages((prev) => [...prev, { 
           type: "bot", 
           text: language === "hi" 
             ? "**नोट: मानक एआई अनुपलब्ध है। आधिकारिक ऑफलाइन रिकॉर्ड पर स्विच किया गया।**" 
             : "**Note: Standard AI is unavailable. Switched to Official Offline Records.**",
           isOffline: true,
-          isOfflineAlert: true
+          isOfflineAlert: true,
+          provider
         }]);
       } else {
-        if (analytics) logEvent(analytics, 'ai_query_success', { query: userMsg });
-        setMessages((prev) => [...prev, { type: "bot", text, isOffline: false }]);
+        setIsOffline(false);
+        if (analytics) logEvent(analytics, 'ai_query_success', { query: userMsg, provider });
+        setMessages((prev) => [...prev, { type: "bot", text, isOffline: false, provider }]);
       }
       setIsTyping(false);
     } catch (error) {
@@ -405,7 +418,7 @@ export default function ElectionBuddy({ isOpen, setIsOpen, currentStep, isDark, 
                   <div>
                     <h3 className="font-bold text-white tracking-widest uppercase text-sm">Votey AI</h3>
                     <p className={`text-[9px] font-bold mt-0.5 uppercase tracking-widest ${isOffline ? "text-[#d97706]" : "text-india-green"}`}>
-                      {isOffline ? "LOCAL KNOWLEDGE BASE" : t.onlineStatus}
+                      {isOffline ? "LOCAL KNOWLEDGE BASE" : (activeProvider === 'groq' ? "GROQ FAILOVER ACTIVE" : t.onlineStatus)}
                     </p>
                   </div>
                 </div>
